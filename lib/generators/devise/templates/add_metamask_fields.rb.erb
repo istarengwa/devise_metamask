@@ -1,0 +1,12 @@
+# frozen_string_literal: true
+
+class Add<%= class_name %>MetamaskFields < ActiveRecord::Migration[7.0]
+  def change
+    change_table :<%= file_name.pluralize %> do |t|
+      t.string :eth_address
+      t.string :metamask_nonce
+    end
+
+    add_index :<%= file_name.pluralize %>, :eth_address, unique: true
+  end
+end
