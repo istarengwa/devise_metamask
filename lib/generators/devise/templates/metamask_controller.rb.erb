@@ -28,12 +28,16 @@ class MetamaskController < ApplicationController
     model = <%= class_name %>
     user = model.find_by(eth_attr => address)
     unless user
-      # If no record exists for this address, create one with a fresh nonce.
-      # The MetamaskAuthenticatable model includes a before_create callback
-      # that sets a random nonce.  Use find_or_initialize_by to avoid race
-      # conditions, then save to persist the record and its nonce.
-      user = model.find_or_initialize_by(eth_attr => address)
-      user.save if user.respond_to?(:save)
+      # Delegate user creation to the from_metamask class method if it
+      # exists; this method assigns a placeholder email and random password
+      # when necessary.  Fallback to default logic if from_metamask is not
+      # implemented.
+      if model.respond_to?(:from_metamask)
+        user = model.from_metamask(address, nil)
+      else
+        user = model.new(eth_attr => address)
+        user.save if user.respond_to?(:save)
+      end
     end
     if user
       render json: { nonce: user.public_send(nonce_attr) }
