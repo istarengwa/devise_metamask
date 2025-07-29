@@ -36,6 +36,14 @@ module Devise
       METAMASK_MESSAGE_PARAM  = (Devise.respond_to?(:metamask_message_param)  ? Devise.metamask_message_param  : 'metamask_message').freeze
       METAMASK_SIGNATURE_PARAM = (Devise.respond_to?(:metamask_signature_param) ? Devise.metamask_signature_param : 'metamask_signature').freeze
 
+      # Determine whether this strategy is applicable to the current request.
+      # We override +valid?+ so that Warden runs the strategy whenever the
+      # MetaMask parameters are present at the top level, even if the default
+      # Devise params (like `user[email]`) are missing.
+      def valid?
+        metamask_address.present? && metamask_message.present? && metamask_signature.present?
+      end
+
       # Entry point for the Warden strategy.  If the MetaMask parameters are
       # missing, we simply pass and allow other strategies to handle the
       # request.  Otherwise we recover the Ethereum address from the signature
