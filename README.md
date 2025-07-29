@@ -1,0 +1,143 @@
+# Devise MetaMask
+
+`devise_metamask` is an extension for [Devise](https://github.com/heartcombo/devise) that allows users to authenticate in a Ruby on Rails application using their Ethereum accounts instead of passwords.  The gem relies on the [`eth`](https://github.com/se3000/ruby-eth) library to recover the public key and address from a message signed with MetaMask and to verify that it matches the address submitted by the client.  It follows the approach described in the blog post “Finally authenticating Rails users with MetaMask,” which recommends storing an Ethereum address and a per‑user random nonce, including that nonce and a timestamp in the message to sign, and rotating the nonce after each successful login to prevent replay attacks【138469095841911†L258-L300】.
+
+## Requirements
+
+- **Ruby >= 2.7** – The gemspec targets Ruby 2.7 or newer.  Check your version with `ruby -v`.
+- **Rails >= 6** – The generator creates a migration using Active Record 7.x syntax.  It also works with Rails 6; adjust the migration version if needed.
+- **Devise >= 4.7** – This gem integrates with Devise 4.7 and above.
+- **MetaMask** – On the client side, users need the MetaMask browser extension (or another wallet) to sign messages via the `ethereum.request({ method: 'personal_sign', … })` API【138469095841911†L331-L377】.
+
+## Installation
+
+### 1. Add the gem to your project
+
+If you have published the gem to RubyGems, simply add it to your `Gemfile`:
+
+```ruby
+gem 'devise_metamask'
+```
+
+and run `bundle install`.
+
+If you are using a hosted or local version of the gem, specify the Git URL:
+
+```ruby
+gem 'devise_metamask', git: 'https://github.com/istarengwa/devise_metamask.git'
+```
+
+### 2. Run the generator
+
+The gem provides a generator that automates the setup:
+
+```bash
+rails generate devise:metamask [Model]
+```
+
+By default the model is `User`.  The generator performs the following tasks:
+
+- Creates `config/initializers/devise_metamask.rb` with default configuration for parameter names and model attributes.
+- Generates a migration named `add_<model>_metamask_fields.rb` that adds `eth_address` and `metamask_nonce` columns to your model’s table and adds a unique index on `eth_address`.
+- Injects `:metamask_authenticatable` into the `devise` call in your model if it isn’t already present.
+
+Example for a `User` model:
+
+```bash
+rails generate devise:metamask User
+rails db:migrate
+```
+
+### 3. Configure your model
+
+The generator automatically adds `:metamask_authenticatable` to your Devise modules.  Your model should look like this:
+
+```ruby
+class User < ApplicationRecord
+  devise :metamask_authenticatable, :registerable, :trackable
+  # other Devise modules …
+end
+```
+
+### 4. Adjust configuration (optional)
+
+The `config/initializers/devise_metamask.rb` initializer defines sensible defaults.  You can override them to match your naming conventions:
+
+```ruby
+Devise.setup do |config|
+  # Field names expected by your MetaMask form/JavaScript
+  config.metamask_address_param   = 'address'
+  config.metamask_message_param   = 'message'
+  config.metamask_signature_param = 'signature'
+
+  # Attributes on your model storing the Ethereum address and nonce
+  config.metamask_eth_attribute   = :eth_address
+  config.metamask_nonce_attribute = :metamask_nonce
+end
+```
+
+## Client‑side usage
+
+To initiate authentication, your front‑end code should:
+
+1. Request the user’s Ethereum address via `ethereum.request({ method: 'eth_requestAccounts' })`.
+2. Fetch the nonce associated with that address from your server.  The blog post proposes storing a random nonce per user and rotating it after each login to prevent replay attacks【138469095841911†L258-L300】.
+3. Build a message string containing a site title, the current timestamp and the nonce, then ask MetaMask to sign it:
+
+   ```js
+   const message = `${title},${Date.now()},${nonce}`;
+   const signature = await ethereum.request({
+     method: 'personal_sign',
+     params: [message, address]
+   });
+   ```
+
+4. Submit the `metamask_address`, `metamask_message` and `metamask_signature` parameters to your Devise session endpoint (for example `POST /users/sign_in`).  The strategy provided by this gem will recover the signer's address using `Eth::Key.personal_recover` and authenticate the user if it matches the stored address【138469095841911†L286-L294】.
+
+### Selecting a blockchain network
+
+The signature algorithm used by MetaMask (EIP‑191/EIP‑155) is identical across all EVM‑compatible networks.  By default, the gem verifies that the signature matches the submitted address, regardless of which network the user is connected to.  If your application needs to restrict authentication to a specific chain (for example [Base](https://base.org/)), you can enforce this on the client:
+
+- Query the current network’s chain ID using:
+
+  ```js
+  const chainId = await ethereum.request({ method: 'eth_chainId' });
+  // Base mainnet chain ID is 0x2105 (decimal 8453)
+  if (chainId !== '0x2105') {
+    // optionally prompt the user to switch networks
+    await ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: '0x2105' }]
+    });
+  }
+  ```
+
+- Include the network name or chain ID in the message you ask the user to sign.  For example:
+
+  ```js
+  const message = `${title},${Date.now()},${nonce},base`;
+  const signature = await ethereum.request({
+    method: 'personal_sign',
+    params: [message, address]
+  });
+  ```
+
+  You can then validate that the expected chain name or ID appears in the signed message either in your controller or by overriding the `valid_message?` method in `Devise::Strategies::MetamaskAuthenticatable`.
+
+These additional checks ensure that users authenticate only on the desired network while keeping the server‑side verification unchanged.
+
+## Available commands
+
+This gem defines one generator:
+
+- `rails generate devise:metamask [Model]` – Installs MetaMask authentication for the specified Devise model (defaults to `User`).  It creates an initializer, adds migration files and injects the module into your model.
+
+Authentication itself is handled via the `:metamask_authenticatable` module and the associated Warden strategy.  As long as your sign‑in request includes the configured parameters, Devise will invoke the MetaMask strategy before falling back to other strategies.
+
+## Contributing
+
+Contributions are welcome!  If you find a bug or have an idea for an improvement, please open an issue or submit a pull request on [GitHub](https://github.com/istarengwa/devise_metamask.git).
+
+## License
+
+This gem is released under the MIT license.  See the `LICENSE.txt` file for details.
