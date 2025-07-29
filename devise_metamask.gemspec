@@ -1,10 +1,11 @@
 # frozen_string_literal: true
+require_relative 'lib/devise_metamask/version'
 
 Gem::Specification.new do |spec|
   spec.name          = "devise_metamask"
   spec.version       = DeviseMetamask::VERSION
-  spec.authors       = ["Your Name"]
-  spec.email         = ["you@example.com"]
+  spec.authors       = ["Istarengwa"]
+  spec.email         = ["lilian@thehackingproject.org"]
 
   spec.summary       = "Add MetaMask login support to Devise-enabled Rails apps"
   spec.description   = <<~DESC
