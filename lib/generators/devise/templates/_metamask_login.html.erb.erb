@@ -35,9 +35,10 @@
         });
         // Submit the credentials to your sign-in endpoint
         const body = new URLSearchParams();
-        body.append('<%= Devise.metamask_address_param %>', address);
-        body.append('<%= Devise.metamask_message_param %>', message);
-        body.append('<%= Devise.metamask_signature_param %>', signature);
+        // Use configured parameter names or fall back to defaults
+        body.append('<%= (Devise.respond_to?(:metamask_address_param) && Devise.metamask_address_param.present?) ? Devise.metamask_address_param : "metamask_address" %>', address);
+        body.append('<%= (Devise.respond_to?(:metamask_message_param) && Devise.metamask_message_param.present?) ? Devise.metamask_message_param : "metamask_message" %>', message);
+        body.append('<%= (Devise.respond_to?(:metamask_signature_param) && Devise.metamask_signature_param.present?) ? Devise.metamask_signature_param : "metamask_signature" %>', signature);
         const loginResponse = await fetch('<%= Rails.application.routes.url_helpers.new_session_path(model_name.downcase) rescue "/users/sign_in" %>', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

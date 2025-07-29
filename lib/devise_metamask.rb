@@ -16,6 +16,21 @@ module DeviseMetamask
     Devise.metamask_allowed_networks = []
   end
 
+  # Define configuration accessors for parameter and attribute names.  These
+  # values are used by the generator's view template and can be set in your
+  # initializer.  They default to nil and are only defined if missing.
+  %i[
+    metamask_address_param
+    metamask_message_param
+    metamask_signature_param
+    metamask_eth_attribute
+    metamask_nonce_attribute
+  ].each do |attr|
+    unless Devise.respond_to?(attr)
+      Devise.singleton_class.attr_accessor attr
+    end
+  end
+
   # Register the :metamask_authenticatable module with Devise.  When this gem
   # is loaded, Devise will recognise the module and make it available in the
   # devise declaration in your models, e.g.:
