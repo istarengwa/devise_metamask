@@ -44,7 +44,7 @@ By default the model is `User`.  The generator automates the entire setup:
 - It creates `app/controllers/metamask_controller.rb` with a `nonce` action that returns the stored nonce for a given Ethereum address in JSON.
 - It adds a route `get '/metamask_nonce', to: 'metamask#nonce'` to your `config/routes.rb` so the client can fetch the nonce via `GET /metamask_nonce?address=…`.
 
-When the generated controller receives a request for an address that does not yet exist in your database, it automatically creates a new record with that Ethereum address and generates an initial nonce.  If your model includes Devise’s `:database_authenticatable` and `:validatable` modules, a placeholder email (for example `abcd…@metamask.local`) and a random password are assigned so the record satisfies the email and password validations.  You can customise this behaviour by defining a class method `from_metamask(address, message)` on your model; if defined, it will be used instead of the default logic.
+When the generated controller receives a request for an address that does not yet exist in your database, it delegates the decision to your model via the class method `from_metamask`.  By default, this method creates a user with a placeholder e‑mail and a random password (see below), mais si votre modèle comporte d’autres validations, la création peut échouer.  Si `from_metamask` renvoie un enregistrement non persisté, le contrôleur répondra `404` afin que vous puissiez imposer un flux d’inscription personnalisé.  Vous pouvez surcharger `from_metamask(address, message)` dans votre modèle pour créer l’utilisateur avec les champs requis ou pour empêcher la création automatique.
 
 Example for a `User` model:
 
@@ -142,17 +142,27 @@ To initiate authentication, your front‑end code should:
 
 1. Request the user’s Ethereum address via `ethereum.request({ method: 'eth_requestAccounts' })`.
 2. Fetch the nonce associated with that address from your server.  The blog post proposes storing a random nonce per user and rotating it after each login to prevent replay attacks【138469095841911†L258-L300】.
-3. Build a message string containing a site title, the current timestamp and the nonce, then ask MetaMask to sign it:
+3. Build a message string containing a site title, the current timestamp and the nonce.  When calling `personal_sign`, MetaMask expects the message to be hex‑encoded UTF‑8【256823775269663†L300-L334】.  The generator’s partial performs this conversion automatically, but if you roll your own client code you can convert it like this:
 
    ```js
    const message = `${title},${Date.now()},${nonce}`;
+   // Convert the message to a hex string (without 0x) using TextEncoder
+   const utf8ToHex = (str) => {
+     const bytes = new TextEncoder().encode(str);
+     return Array.from(bytes)
+       .map((b) => b.toString(16).padStart(2, '0'))
+       .join('');
+   };
+   const hexMessage = `0x${utf8ToHex(message)}`;
    const signature = await ethereum.request({
      method: 'personal_sign',
-     params: [message, address]
+     params: [hexMessage, address]
    });
    ```
 
-4. Submit the `metamask_address`, `metamask_message` and `metamask_signature` parameters to your Devise session endpoint (for example `POST /users/sign_in`).  The strategy provided by this gem will recover the signer's address using `Eth::Key.personal_recover` and authenticate the user if it matches the stored address【138469095841911†L286-L294】.
+   You should still send the original human‑readable message (not the hex version) to the server so that it can be checked and used to validate nonces and timestamps.
+
+4. Submit the `metamask_address`, `metamask_message` and `metamask_signature` parameters to your Devise session endpoint (for example `POST /users/sign_in`).  The strategy provided by this gem will recover the signer's address using `Eth::Signature.personal_recover`, decode the message if necessary and authenticate the user if it matches the stored address【369635869403598†L156-L198】.
 
 ### Selecting a blockchain network
 

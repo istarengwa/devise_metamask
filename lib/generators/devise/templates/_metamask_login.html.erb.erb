@@ -29,9 +29,18 @@
         messageParts.push(nonce);
         // TODO: append network name here if required
         const message = messageParts.join(',');
+        // MetaMask expects the message data to be a hex‑encoded UTF‑8 string
+        // when calling personal_sign【256823775269663†L300-L334】.  Convert the
+        // human‑readable message into a hex string.  We still send the
+        // original message to the server for verification.
+        const utf8ToHex = (str) => {
+          const bytes = new TextEncoder().encode(str);
+          return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+        };
+        const hexMessage = `0x${utf8ToHex(message)}`;
         const signature = await ethereum.request({
           method: 'personal_sign',
-          params: [message, address]
+          params: [hexMessage, address]
         });
         // Submit the credentials to your sign-in endpoint
         const body = new URLSearchParams();

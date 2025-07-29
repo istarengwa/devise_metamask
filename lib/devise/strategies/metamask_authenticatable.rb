@@ -109,7 +109,29 @@ module Devise
       # signature and message, then converts it into an address.
       def valid_signature?
         begin
-          recovered_public_key = Eth::Key.personal_recover(metamask_message, metamask_signature)
+          # MetaMask signs hex‑encoded messages by default. If the supplied
+          # message starts with "0x", it represents a UTF‑8 message encoded as
+          # hex; decode it back into a plain string before attempting
+          # signature recovery. Otherwise use the message verbatim.  See
+          # MetaMask docs: for historical reasons, personal_sign data must be
+          # hex‑encoded【256823775269663†L300-L334】.
+          msg = metamask_message.to_s
+          if msg.start_with?('0x')
+            # Drop the 0x prefix and pack hex into binary, then force
+            # encoding to UTF‑8.  If decoding fails, fall back to the raw
+            # string.
+            begin
+              hex = msg[2..]
+              binary = [hex].pack('H*')
+              msg = binary.force_encoding('UTF-8')
+            rescue StandardError
+              msg = metamask_message
+            end
+          end
+          # Recover the public key using Eth::Signature rather than
+          # Eth::Key.  The Signature module provides helpers for
+          # personal_sign recovery (EIP‑191)【369635869403598†L156-L198】.
+          recovered_public_key = Eth::Signature.personal_recover(msg, metamask_signature)
           recovered_address = Eth::Utils.public_key_to_address(recovered_public_key).downcase
           recovered_address_without_prefix = recovered_address.start_with?('0x') ? recovered_address[2..] : recovered_address
           normalized_address == recovered_address_without_prefix && valid_message?

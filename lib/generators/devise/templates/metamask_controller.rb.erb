@@ -28,15 +28,13 @@ class MetamaskController < ApplicationController
     model = <%= class_name %>
     user = model.find_by(eth_attr => address)
     unless user
-      # Delegate user creation to the from_metamask class method if it
-      # exists; this method assigns a placeholder email and random password
-      # when necessary.  Fallback to default logic if from_metamask is not
-      # implemented.
+      # Ask the model to create or fetch a user from MetaMask.  If the
+      # returned record is persisted, use it; otherwise return 404.  This
+      # allows applications to decide whether to create users on the fly or
+      # require a signup flow.
       if model.respond_to?(:from_metamask)
         user = model.from_metamask(address, nil)
-      else
-        user = model.new(eth_attr => address)
-        user.save if user.respond_to?(:save)
+        user = nil unless user&.persisted?
       end
     end
     if user
