@@ -64,6 +64,20 @@ module Devise
           user = find_by(eth_attribute => addr)
           return user if user
           new_user = new(eth_attribute => addr)
+          # Assign a placeholder email and password if the model has these
+          # attributes and they are blank.  This helps satisfy Devise
+          # validations provided by :database_authenticatable and :validatable.
+          if new_user.respond_to?(:email) && new_user.email.blank?
+            new_user.email = "#{addr}@metamask.local"
+          end
+          if new_user.respond_to?(:password)
+            random_password = SecureRandom.hex(16)
+            new_user.password = random_password
+            if new_user.respond_to?(:password_confirmation)
+              new_user.password_confirmation = random_password
+            end
+          end
+          # Ensure the nonce is set before saving
           new_user.send(:ensure_metamask_nonce)
           new_user.save
           new_user
@@ -94,6 +108,37 @@ module Devise
       def nonce_attribute
         self.class.nonce_attribute
       end
+
+      public
+
+      # Return true if this record has an Ethereum address.  Applications can
+      # use this helper in views to determine whether a user authenticated via
+      # MetaMask.  For example, you can hide email/password fields when
+      # +metamask_user?+ returns true.
+      def metamask_user?
+        addr_attr = self.class.eth_attribute
+        respond_to?(addr_attr) && send(addr_attr).present?
+      end
+
+      # Devise calls this method to determine whether an e‑mail is required.
+      # We bypass the requirement for MetaMask users so they can be created
+      # without an e‑mail address when :validatable is enabled.  Override in
+      # your model if you need different behaviour.
+      def email_required?
+        return false if metamask_user?
+        super
+      end if method_defined?(:email_required?)
+
+      # Devise calls this method to determine whether a password is required.
+      # Skip password requirement for MetaMask users.  This allows accounts
+      # created via MetaMask to be saved without a password.  Override if
+      # necessary.  Note that Devise controllers may still ask for the
+      # current password when updating sensitive attributes; see the README
+      # for guidance on overriding Devise::RegistrationsController.
+      def password_required?
+        return false if metamask_user?
+        super
+      end if method_defined?(:password_required?)
     end
   end
 end
