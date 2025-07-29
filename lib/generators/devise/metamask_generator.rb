@@ -47,12 +47,11 @@ module Devise
         if File.read(model_path).match?(/:metamask_authenticatable/)
           say_status :identical, "#{model_path}", :blue
         else
-          # Inject the module into the devise declaration.  This naïvely looks
-          # for the first occurrence of 'devise' and inserts the symbol.  If
-          # devise is called on multiple lines, this may need manual editing.
+          # Prepend the :metamask_authenticatable module to the devise call.
+          # This avoids creating double commas in the existing list of modules.
           inject_into_file model_path,
-                           ', :metamask_authenticatable',
-                           after: /devise[^\n]*/
+                           ':metamask_authenticatable, ',
+                           after: /devise\s+/
           say_status :insert, "Added :metamask_authenticatable to #{model_path}", :green
         end
       end
