@@ -57,6 +57,13 @@ module Devise
         end
       end
 
+      # Copy a sample view partial that renders a MetaMask connect button.  You can
+      # render this partial in your layout or sign-in page to trigger the
+      # login flow.  The partial is placed in app/views/shared/_metamask_login.html.erb.
+      def copy_view_partial
+        template '_metamask_login.html.erb.erb', File.join('app', 'views', 'shared', '_metamask_login.html.erb')
+      end
+
       private
 
       # Convert model name to underscore file name

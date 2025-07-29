@@ -1,0 +1,57 @@
+<div id="metamask-login">
+  <button id="metamask-connect-button" type="button">Connect with MetaMask</button>
+</div>
+
+<script type="module">
+  // This script attaches a click handler to the button and performs the MetaMask
+  // sign-in flow.  It is intentionally simple; you may wish to extract
+  // functions into your own JavaScript pack or stimulus controller.
+  document.addEventListener('DOMContentLoaded', () => {
+    const button = document.getElementById('metamask-connect-button');
+    if (!button) return;
+    button.addEventListener('click', async () => {
+      if (typeof window.ethereum === 'undefined') {
+        alert('MetaMask is not available.');
+        return;
+      }
+      try {
+        // Request accounts
+        const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+        const address = accounts[0];
+        // Fetch the nonce from your API (replace with your own endpoint)
+        const response = await fetch(`/metamask_nonce?address=${address}`);
+        const { nonce } = await response.json();
+        // Build the message.  Append a network name if you use
+        // config.metamask_allowed_networks.
+        const messageParts = [];
+        messageParts.push(document.title);
+        messageParts.push(Date.now());
+        messageParts.push(nonce);
+        // TODO: append network name here if required
+        const message = messageParts.join(',');
+        const signature = await ethereum.request({
+          method: 'personal_sign',
+          params: [message, address]
+        });
+        // Submit the credentials to your sign-in endpoint
+        const body = new URLSearchParams();
+        body.append('<%= Devise.metamask_address_param %>', address);
+        body.append('<%= Devise.metamask_message_param %>', message);
+        body.append('<%= Devise.metamask_signature_param %>', signature);
+        const loginResponse = await fetch('<%= Rails.application.routes.url_helpers.new_session_path(model_name.downcase) rescue "/users/sign_in" %>', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString()
+        });
+        if (loginResponse.ok) {
+          window.location.reload();
+        } else {
+          alert('Sign in failed');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error signing in with MetaMask');
+      }
+    });
+  });
+</script>

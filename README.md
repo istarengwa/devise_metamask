@@ -74,6 +74,58 @@ Devise.setup do |config|
   config.metamask_eth_attribute   = :eth_address
   config.metamask_nonce_attribute = :metamask_nonce
 end
+
+### 6. Add the MetaMask connect button to your views
+
+The generator copies a sample partial to `app/views/shared/_metamask_login.html.erb`.  This partial renders a “Connect with MetaMask” button and includes a small script that performs the sign‑in flow: it requests the user’s account, fetches the nonce from your server, constructs the message and sends the signed credentials to your sign‑in endpoint.
+
+Render this partial wherever you want the button to appear, for example in `app/views/layouts/application.html.erb`:
+
+```erb
+<%= render 'shared/metamask_login' %>
+```
+
+You should adapt the JavaScript in the partial to match your application (API endpoints, handling of allowed networks, etc.).  The partial uses the configuration values defined in `config/initializers/devise_metamask.rb` to name the submitted parameters.  It also includes a placeholder for appending a network name if you enabled `config.metamask_allowed_networks`.
+
+### 5. Restrict authentication to specific networks (optional)
+
+If you want to ensure that users sign on a particular blockchain network (e.g. Ethereum mainnet or Base) you can configure a whitelist of allowed networks.  The strategy will only accept signatures whose message ends with one of these network identifiers.  For example, to restrict authentication to the Ethereum mainnet and the Base network:
+
+```ruby
+Devise.setup do |config|
+  # … other configuration …
+  # Only accept messages signed for these networks
+  config.metamask_allowed_networks = %w[eth base]
+end
+```
+
+On the client side, you must append the network name to the message you ask the user to sign, otherwise the signature will be rejected.  For instance, for Base (chain ID `0x2105`) and Ethereum (chain ID `0x1`) you could do:
+
+```js
+// Determine the current network and set a human‑readable name
+const chainId = await ethereum.request({ method: 'eth_chainId' });
+let networkName;
+switch (chainId) {
+  case '0x1':
+    networkName = 'eth';
+    break;
+  case '0x2105':
+    networkName = 'base';
+    break;
+  // add other networks as needed
+  default:
+    throw new Error('Unsupported network');
+}
+
+// Build the message including the network name
+const message = `${title},${Date.now()},${nonce},${networkName}`;
+const signature = await ethereum.request({
+  method: 'personal_sign',
+  params: [message, address]
+});
+```
+
+This mechanism is optional; if `config.metamask_allowed_networks` is empty (the default), the gem accepts signatures from any network.  Remember that the signature algorithm itself is the same across all EVM networks【138469095841911†L286-L294】; the network check is purely an application‑level policy.
 ```
 
 ## Client‑side usage

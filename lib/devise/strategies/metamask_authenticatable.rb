@@ -124,7 +124,17 @@ module Devise
       # implementation would extract a timestamp and nonce and ensure the
       # message is recent and contains the nonce stored on the resource.
       def valid_message?
-        true
+        # If allowed networks are configured, require the message to include a
+        # network name and ensure it matches the whitelist.  The message is
+        # expected to be comma‑separated with four parts: title, timestamp,
+        # nonce and network.  If no networks are configured, accept any
+        # message.
+        allowed = Devise.respond_to?(:metamask_allowed_networks) ? Devise.metamask_allowed_networks : []
+        return true if allowed.nil? || allowed.empty?
+        parts = metamask_message.to_s.split(',')
+        return false unless parts.length >= 4
+        network = parts.last.to_s.downcase.strip
+        allowed.map(&:downcase).include?(network)
       end
     end
   end
