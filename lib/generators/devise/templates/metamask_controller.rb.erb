@@ -1,0 +1,36 @@
+# frozen_string_literal: true
+
+<%#
+  This controller serves the nonce for a given Ethereum address.  The client
+  fetches the nonce before signing the login message.  It expects the
+  address to be provided as a query parameter (e.g. `/metamask_nonce?address=0x123…`).
+  The generator substitutes the correct model class name and attribute names.
+%>
+
+class MetamaskController < ApplicationController
+  # Disable CSRF protection for this endpoint since it is called from
+  # JavaScript before the user is authenticated.  You may wish to
+  # enforce authenticity tokens instead depending on your security model.
+  skip_before_action :verify_authenticity_token
+
+  # Return the stored nonce for the user with the given Ethereum address.
+  # The address parameter is normalized (downcased and stripped of the 0x
+  # prefix) before lookup.  If a record is found, the nonce is returned as
+  # JSON; otherwise a 404 status is returned.
+  def nonce
+    address = params[:address].to_s.downcase.sub(/^0x/, '')
+    # Determine which attribute stores the Ethereum address.  Use the
+    # configured attribute or fall back to the default.
+    eth_attr   = Devise.metamask_eth_attribute || :eth_address
+    nonce_attr = Devise.metamask_nonce_attribute || :metamask_nonce
+    # Use the configured model class to look up the record.  Substitute
+    # the class name at generation time.
+    model = <%= class_name %>
+    user  = model.find_by(eth_attr => address)
+    if user
+      render json: { nonce: user.public_send(nonce_attr) }
+    else
+      head :not_found
+    end
+  end
+end

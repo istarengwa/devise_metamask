@@ -63,6 +63,20 @@ module Devise
         template '_metamask_login.html.erb.erb', File.join('app', 'views', 'shared', '_metamask_login.html.erb')
       end
 
+      # Create a MetamaskController with an action that returns the nonce for
+      # a given address.  The controller will look up the record by the
+      # configured Ethereum address attribute and return the configured nonce
+      # attribute in JSON.  The model name is derived from the generator
+      # argument (User by default).
+      def create_metamask_controller
+        template 'metamask_controller.rb.erb', File.join('app', 'controllers', 'metamask_controller.rb')
+      end
+
+      # Add a route to fetch the nonce via GET /metamask_nonce
+      def add_nonce_route
+        route "get '/metamask_nonce', to: 'metamask#nonce'"
+      end
+
       private
 
       # Convert model name to underscore file name
